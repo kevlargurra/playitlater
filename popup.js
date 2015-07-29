@@ -1,4 +1,4 @@
-var shows;
+var shows, expDates = [];
 
 var month_names = [];
 month_names[month_names.length] = "jan";
@@ -15,18 +15,22 @@ month_names[month_names.length] = "nov";
 month_names[month_names.length] = "dec";
 
 function updatePopup() {
-    var dataElement = document.getElementById("data"), htmlData = "<ul>", i, expDate, today = new Date(), diff;
-    document.getElementById("data").innerHTML = "";
+    var htmlData = "<ul>",
+        lastDayToWatch,
+        today = new Date(),
+        daysLeftToWatch,
+        i;
     if (shows === undefined || shows.length < 1) {
         htmlData = htmlData + "<li>Inga sparade program kunde hittas</li>";
     } else {
         for (i = 0; i < shows.length; i += 1) {
-            console.log("Show " + i + ": " + shows[i].showId);
-            expDate = new Date(shows[i].expDate);
-            diff = Math.floor((expDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+            lastDayToWatch = new Date(shows[i].expDate);
+            daysLeftToWatch = Math.floor((lastDayToWatch.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
             htmlData = htmlData + "<li><p><img src=\"" + shows[i].thumbnailUrl + "\" width=50>" +
-                "<a id=" + shows[i].showId + " href=\"" + shows[i].link + "\" + target=\"_blank\" title=\"" + shows[i].longdescription + "\">" +
-                shows[i].title + "</a>, kan ses till " + expDate.getDate() + " " + month_names[expDate.getMonth()] + " (" + diff + " dagar kvar)</p></li>";
+                "<a id=" + shows[i].showId + " href=\"" + shows[i].link + "\" + target=\"_blank\" title=\"" +
+                shows[i].longdescription + "\">" +
+                shows[i].title + "</a>, kan ses till " + lastDayToWatch.getDate() + " " + month_names[lastDayToWatch.getMonth()] +
+                " (" + daysLeftToWatch + " dagar kvar)</p></li>";
         }
     }
     htmlData = htmlData + "</ul>";
@@ -34,12 +38,13 @@ function updatePopup() {
 }
 
 function loadSavedShows() {
+    var i;
     chrome.storage.sync.get("shows", function (result) {
-        if (chrome.runtime.error) {
-            console.log("Runtime error when getting old data!");
-        }
         if (result.shows !== undefined) {
             shows = result.shows;
+            shows.sort(function (show1, show2) {
+                return show1.expDate > show2.expDate ? 1 : -1;
+            });
         }
         updatePopup();
     });

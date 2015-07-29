@@ -1,6 +1,6 @@
 {
   "name": "SVTPlayItLater",
-  "version": "0.0.1.1",
+  "version": "0.0.1.2",
   "manifest_version": 2,
   "content_scripts": [
     {
@@ -11,8 +11,7 @@
   ],
   "permissions": [
     "http://www.svtplay.se/",
-    "storage",
-    "tabs"
+    "storage"
   ],
   "browser_action": {
       "default_icon": {
