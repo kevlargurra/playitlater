@@ -111,6 +111,7 @@ function checkIfThisShowIsSaved() {
 
 chrome.storage.onChanged.addListener(function (changes, areaName) {
     var i;
+    shows = changes.shows.newValue;
     for (i = 0; i < changes.shows.newValue.length; i += 1) {
         if (showId === changes.shows.newValue[i].showId) {
             setSaveButton(true);
