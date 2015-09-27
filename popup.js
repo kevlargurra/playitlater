@@ -15,27 +15,132 @@ month_names[month_names.length] = "nov";
 month_names[month_names.length] = "dec";
 
 function updatePopup() {
-    var htmlData = "<ul>",
+    var showItem,
+        showId,
         lastDayToWatch,
         today = new Date(),
         daysLeftToWatch,
+        deleteLink,
+        listItem,
+        unorderedList,
+        showLink,
+        showDataDiv,
+        thumbnailElement,
+        saveUnsaveLinkText,
         i;
+
+    showDataDiv = document.getElementById("data");
+    unorderedList = document.createElement("ul");
+    showDataDiv.appendChild(unorderedList);
     if (shows === undefined || shows.length < 1) {
-        htmlData = htmlData + "<li>Inga sparade program kunde hittas</li>";
+        listItem = document.createElement("li");
+        listItem.appendChild(document.createTextNode("Inga sparade program kunde hittas"));
+        showDataDiv.appendChild(listItem);
     } else {
         for (i = 0; i < shows.length; i += 1) {
+            showItem = {};
+            
+            showId = shows[i].showId;
+            // create "show" object with all data needed to re-save show + listener for save/unsave link
+            showItem.showId = showId;
+            showItem.expDate = shows[i].expDate;
+            showItem.link = shows[i].link;
+            showItem.title = shows[i].title;
+            showItem.longdescription = shows[i].longdescription;
+            showItem.thumbnailUrl = shows[i].thumbnailUrl;
+            showItem.isSaved = true;
+            
+            // calculate last day to watch and days left to watch
             lastDayToWatch = new Date(shows[i].expDate);
             daysLeftToWatch = Math.floor((lastDayToWatch.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-            htmlData = htmlData + "<li><p><img src=\"" + shows[i].thumbnailUrl + "\" width=50>" +
-                "<a id=" + shows[i].showId + " href=\"" + shows[i].link + "\" + target=\"_blank\" title=\"" +
-                shows[i].longdescription + "\">" +
-                shows[i].title + "</a>, kan ses till " + lastDayToWatch.getDate() + " " + month_names[lastDayToWatch.getMonth()] +
-                " (" + daysLeftToWatch + " dagar kvar)</p></li>";
+            
+            // create and populate HTML elements
+            listItem = document.createElement("li");
+            
+            thumbnailElement = document.createElement("img");
+            thumbnailElement.setAttribute("src", shows[i].thumbnailUrl);
+            thumbnailElement.setAttribute("width", 50);
+            listItem.appendChild(thumbnailElement);
+            
+            listItem.appendChild(document.createElement("p"));
+            showLink = document.createElement("a");
+            showLink.setAttribute("href", shows[i].link);
+            showLink.setAttribute("target", "_blank");
+            showLink.setAttribute("title", shows[i].longdescription);
+            showLink.innerHTML = shows[i].title; // innerHTML instead of textnode to preserve special characters
+            listItem.appendChild(showLink);
+            listItem.appendChild(document.createElement("br"));
+            
+            listItem.appendChild(document.createTextNode("Kan ses till " + lastDayToWatch.getDate() + " " + month_names[lastDayToWatch.getMonth()] +
+                " (" + daysLeftToWatch + " dagar kvar)"));
+            listItem.appendChild(document.createElement("br"));
+            
+            saveUnsaveLink = document.createElement("a");
+            saveUnsaveLink.setAttribute("href", "#");
+            saveUnsaveLinkText = document.createTextNode("Sluta spara");
+            saveUnsaveLink.appendChild(saveUnsaveLinkText);
+            
+            // update object
+            showItem.saveUnsaveLinkText = saveUnsaveLinkText;
+            showItem.showId = showId;
+            showItem.isSaved = true;
+            fn = saveUnsaveLinkUpdater.bind(showItem);
+            showItem.saveUnsaveLinkUpdaterFunction = fn;
+            
+            saveUnsaveLink.addEventListener("click", showItem.saveUnsaveLinkUpdaterFunction);
+            
+            listItem.appendChild(saveUnsaveLink);
+            unorderedList.appendChild(listItem);
+
         }
     }
-    htmlData = htmlData + "</ul>";
-    document.getElementById("data").innerHTML = htmlData;
 }
+
+function saveShow(showItem) {
+    var showDataToSave,
+        showData = {
+            showId: showItem.showId,
+            expDate: showItem.expDate,
+            link: showItem.link,
+            title: showItem.title,
+            longdescription: showItem.longdescription,
+            thumbnailUrl: showItem.thumbnailUrl
+        };
+    shows.push(showData);
+  
+    showDataToSave = {"shows": shows};
+    chrome.storage.sync.set(showDataToSave, function() {
+      showItem.saveUnsaveLinkText.nodeValue = "Sluta spara";
+      showItem.isSaved = true;
+    });
+}
+
+function unsaveShow(showItem) {
+    var showDataToSave = {};
+    for (i = 0; i < shows.length; i += 1) {
+        if (shows[i].showId === showItem.showId) {
+            shows.splice(i, 1);
+            break;
+        }
+    }
+    showDataToSave = {"shows": shows};
+    chrome.storage.sync.set(showDataToSave, function() {
+      showItem.saveUnsaveLinkText.nodeValue = "Spara";  
+      showItem.isSaved = false;
+    });
+}
+
+var saveUnsaveLinkUpdater = function (event) {
+  event.preventDefault();
+  if (this.isSaved) {
+    unsaveShow(this);
+  }
+  else {
+    saveShow(this);
+  }
+};
+
+
 
 function loadSavedShows() {
     var i;
