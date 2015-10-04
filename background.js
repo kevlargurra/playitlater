@@ -66,6 +66,7 @@ function setSaveButton(showIsSaved) {
         saveButton,
         unsaveButton;
     tag.setAttribute("href", "#");
+    tag.setAttribute("class", "play_video-area-aside__title-page-link");
     if (showIsSaved) {
         saveDiv.removeChild(saveDiv.firstChild);
         tag.setAttribute("id", "unsave");
