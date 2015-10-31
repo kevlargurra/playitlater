@@ -1,4 +1,4 @@
-var shows, expDates = [];
+var shows = [], expDates = [], show;
 
 var month_names = [];
 month_names[month_names.length] = "jan";
@@ -14,9 +14,29 @@ month_names[month_names.length] = "okt";
 month_names[month_names.length] = "nov";
 month_names[month_names.length] = "dec";
 
+function saveShow(showAndLink) {
+    showAndLink[0].save(function () {
+        showAndLink[1].nodeValue = "Sluta spara";
+    });
+}
+
+function unsaveShow(showAndLink) {
+    showAndLink[0].unsave(function () {
+        showAndLink[1].nodeValue = "Spara";
+    });
+}
+
+var saveUnsaveLinkUpdater = function (event) {
+    event.preventDefault();
+    if (this[0].isSaved) {
+        unsaveShow(this);
+    } else {
+        saveShow(this);
+    }
+};
+
 function updatePopup() {
-    var showItem,
-        showId,
+    var showId,
         lastDayToWatch,
         today = new Date(),
         daysLeftToWatch,
@@ -27,6 +47,9 @@ function updatePopup() {
         showDataDiv,
         thumbnailElement,
         saveUnsaveLinkText,
+        saveUnsaveLink,
+        expDate,
+        thisShow,
         i;
 
     showDataDiv = document.getElementById("data");
@@ -37,37 +60,40 @@ function updatePopup() {
         listItem.appendChild(document.createTextNode("Inga sparade program kunde hittas"));
         showDataDiv.appendChild(listItem);
     } else {
-        for (i = 0; i < shows.length; i += 1) {
-            showItem = {};
-            
-            showId = shows[i].showId;
-            // create "show" object with all data needed to re-save show + listener for save/unsave link
-            showItem.showId = showId;
-            showItem.expDate = shows[i].expDate;
-            showItem.link = shows[i].link;
-            showItem.title = shows[i].title;
-            showItem.longdescription = shows[i].longdescription;
-            showItem.thumbnailUrl = shows[i].thumbnailUrl;
-            showItem.isSaved = true;
-            
-            // calculate last day to watch and days left to watch
-            lastDayToWatch = new Date(shows[i].expDate);
-            daysLeftToWatch = Math.floor((lastDayToWatch.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        for (i = 0; i < shows.length; i++) {
+            expDate = new Date(shows[i][1].expDate);
+            thisShow = new Show(
+                shows[i][0],
+                shows[i][1].title,
+                shows[i][1].link,
+                shows[i][1].longdescription,
+                expDate,
+                shows[i][1].thumbnailUrl,
+                true
+            );
+
+            // calculate last day to watch and days left to watch, delete unwatchable shows
+            lastDayToWatch = new Date(thisShow.expirationDate);
+            daysLeftToWatch = thisShow.getDaysLeft();
+            if (daysLeftToWatch < 0) {
+                thisShow.unsave();
+                continue;
+            }
             
             // create and populate HTML elements
             listItem = document.createElement("li");
             
             thumbnailElement = document.createElement("img");
-            thumbnailElement.setAttribute("src", shows[i].thumbnailUrl);
+            thumbnailElement.setAttribute("src", thisShow.thumbnailLink);
             thumbnailElement.setAttribute("width", 50);
             listItem.appendChild(thumbnailElement);
             
             listItem.appendChild(document.createElement("p"));
             showLink = document.createElement("a");
-            showLink.setAttribute("href", shows[i].link);
+            showLink.setAttribute("href", thisShow.link);
             showLink.setAttribute("target", "_blank");
-            showLink.setAttribute("title", shows[i].longdescription);
-            showLink.innerHTML = shows[i].title; // innerHTML instead of textnode to preserve special characters
+            showLink.setAttribute("title", thisShow.descr);
+            showLink.innerHTML = thisShow.title; // innerHTML instead of textnode to preserve special characters
             listItem.appendChild(showLink);
             listItem.appendChild(document.createElement("br"));
             
@@ -80,14 +106,7 @@ function updatePopup() {
             saveUnsaveLinkText = document.createTextNode("Sluta spara");
             saveUnsaveLink.appendChild(saveUnsaveLinkText);
             
-            // update object
-            showItem.saveUnsaveLinkText = saveUnsaveLinkText;
-            showItem.showId = showId;
-            showItem.isSaved = true;
-            fn = saveUnsaveLinkUpdater.bind(showItem);
-            showItem.saveUnsaveLinkUpdaterFunction = fn;
-            
-            saveUnsaveLink.addEventListener("click", showItem.saveUnsaveLinkUpdaterFunction);
+            saveUnsaveLink.addEventListener("click", saveUnsaveLinkUpdater.bind([thisShow, saveUnsaveLinkText]));
             
             listItem.appendChild(saveUnsaveLink);
             unorderedList.appendChild(listItem);
@@ -96,59 +115,18 @@ function updatePopup() {
     }
 }
 
-function saveShow(showItem) {
-    var showDataToSave,
-        showData = {
-            showId: showItem.showId,
-            expDate: showItem.expDate,
-            link: showItem.link,
-            title: showItem.title,
-            longdescription: showItem.longdescription,
-            thumbnailUrl: showItem.thumbnailUrl
-        };
-    shows.push(showData);
-  
-    showDataToSave = {"shows": shows};
-    chrome.storage.sync.set(showDataToSave, function() {
-      showItem.saveUnsaveLinkText.nodeValue = "Sluta spara";
-      showItem.isSaved = true;
-    });
-}
-
-function unsaveShow(showItem) {
-    var showDataToSave = {};
-    for (i = 0; i < shows.length; i += 1) {
-        if (shows[i].showId === showItem.showId) {
-            shows.splice(i, 1);
-            break;
-        }
-    }
-    showDataToSave = {"shows": shows};
-    chrome.storage.sync.set(showDataToSave, function() {
-      showItem.saveUnsaveLinkText.nodeValue = "Spara";  
-      showItem.isSaved = false;
-    });
-}
-
-var saveUnsaveLinkUpdater = function (event) {
-  event.preventDefault();
-  if (this.isSaved) {
-    unsaveShow(this);
-  }
-  else {
-    saveShow(this);
-  }
-};
-
-
-
 function loadSavedShows() {
-    var i;
-    chrome.storage.sync.get("shows", function (result) {
-        if (result.shows !== undefined) {
-            shows = result.shows;
+    var i, allShows = [];
+    chrome.storage.sync.get(null, function (items) {
+        var allShowIds = Object.keys(items), key;
+        if (Object.keys(items).length > 0) {
+            for (key in items) {
+                if (items.hasOwnProperty(key)) {
+                    shows.push([key, items[key]]);
+                }
+            }
             shows.sort(function (show1, show2) {
-                return show1.expDate > show2.expDate ? 1 : -1;
+                return show1[1].expDate > show2[1].expDate ? 1 : -1;
             });
         }
         updatePopup();

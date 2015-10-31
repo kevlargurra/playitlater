@@ -1,61 +1,5 @@
-var shows = [], url = document.URL, expDate, title, longDescr, thumbnailUrl, i;
+var url = document.URL, i, show;
 var showId = url.split("/")[4];
-
-/**
-  Fetches metadata needed for the save action
-*/
-function fetchMetadata() {
-    var scriptTags = document.getElementsByTagName("script"), json = "", i, metadata;
-    for (i = 0; i < scriptTags.length; i += 1) {
-        if (scriptTags[i].type === "application/ld+json") {
-            json = scriptTags[i].innerText;
-            break;
-        }
-    }
-    metadata = JSON.parse(json);
-    title = metadata.name;
-    longDescr = metadata.description;
-    expDate = metadata.expires;
-    expDate = new Date(expDate.substring(0, 4),
-                       parseInt(expDate.substring(5, 7), 10) - 1,
-                       expDate.substring(8, 10), 23, 59, 59, 999);
-    thumbnailUrl = "http:" + metadata.thumbnailUrl;
-}
-
-/**
-  Saves this show
-*/
-function saveShow() {
-    fetchMetadata();
-    var showDataToSave,
-        showData = {
-            showId: showId,
-            expDate: expDate.getTime(),
-            link: url,
-            title: title,
-            longdescription: longDescr,
-            thumbnailUrl: thumbnailUrl
-        };
-    shows.push(showData);
-  
-    showDataToSave = {"shows": shows};
-    chrome.storage.sync.set(showDataToSave);
-}
-
-/**
-  Unsaves this show
-*/
-function unsaveShow() {
-    var showDataToSave = {};
-    for (i = 0; i < shows.length; i += 1) {
-        if (shows[i].showId === showId) {
-            shows.splice(i, 1);
-            break;
-        }
-    }
-    showDataToSave = {"shows": shows};
-    chrome.storage.sync.set(showDataToSave);
-}
 
 /**
   Sets save button state and adds listener
@@ -75,7 +19,7 @@ function setSaveButton(showIsSaved) {
         unsaveButton = document.getElementById("unsave");
         unsaveButton.addEventListener("click", function (event) {
             event.preventDefault();
-            unsaveShow();
+            show.unsave();
         }, false);
     } else {
         saveDiv.removeChild(saveDiv.firstChild);
@@ -85,42 +29,44 @@ function setSaveButton(showIsSaved) {
         saveButton = document.getElementById("save");
         saveButton.addEventListener("click", function (event) {
             event.preventDefault();
-            saveShow();
+            show.save();
         }, false);
     }
 }
 
 /**
-  Checks save status for this show
+  Fetches metadata needed for the save action
 */
-function checkIfThisShowIsSaved() {
-    var thisShowIsSaved;
-    chrome.storage.sync.get("shows", function (result) {
-        if (result.shows !== undefined) {
-            shows = result.shows;
-        }
-        thisShowIsSaved = false;
-        for (i = 0; i < shows.length; i += 1) {
-            if (shows[i].showId === showId) {
-                thisShowIsSaved = true;
-                break;
-            }
-        }
-        setSaveButton(thisShowIsSaved);
-    });
-}
-
-chrome.storage.onChanged.addListener(function (changes, areaName) {
-    var i;
-    shows = changes.shows.newValue;
-    for (i = 0; i < changes.shows.newValue.length; i += 1) {
-        if (showId === changes.shows.newValue[i].showId) {
-            setSaveButton(true);
-            return;
+function fetchMetadata() {
+    var scriptTags = document.getElementsByTagName("script"), json = "", i, metadata, title, longDescr, expDate, thumbnailUrl;
+    for (i = 0; i < scriptTags.length; i += 1) {
+        if (scriptTags[i].type === "application/ld+json") {
+            json = scriptTags[i].innerText;
+            break;
         }
     }
-    setSaveButton(false);
+    metadata = JSON.parse(json);
+    title = metadata.name;
+    longDescr = metadata.description;
+    expDate = metadata.expires;
+    expDate = new Date(expDate.substring(0, 4),
+                       parseInt(expDate.substring(5, 7), 10) - 1,
+                       expDate.substring(8, 10), 23, 59, 59, 999);
+    thumbnailUrl = "http:" + metadata.thumbnailUrl;
+    show = new Show(showId, title, url, longDescr, expDate, thumbnailUrl);
+    show.isShowSaved(setSaveButton);
+}
+
+
+
+chrome.storage.onChanged.addListener(function (changes, areaName) {
+    if (changes[show.id] !== undefined) {
+        if (changes[show.id].newValue !== undefined) {
+            setSaveButton(true);
+        } else {
+            setSaveButton(false);
+        }
+    }
 });
 
-checkIfThisShowIsSaved();
-
+fetchMetadata();

@@ -1,12 +1,12 @@
 {
   "name": "PlayItLater",
   "short_name": "PlayItLater",
-  "version": "0.0.1.6",
+  "version": "0.0.1.7",
   "manifest_version": 2,
   "content_scripts": [
     {
       "matches": ["http://www.svtplay.se/video/*"],
-      "js": ["background.js"],
+      "js": ["show.js", "background.js"],
       "run_at": "document_end"
     }
   ],
